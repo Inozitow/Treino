@@ -96,6 +96,11 @@ nav button.on{color:var(--p2);border-top-color:var(--p);font-weight:700}
 .wr{display:flex;justify-content:space-between;gap:8px;padding:10px 12px;border-radius:12px;margin:6px 0;border:2px solid var(--ln)}
 .wr.g{background:#0f3d2a;border-color:var(--ok)}.wr.r{background:#4a1520;border-color:var(--red)}
 #cdt{width:100%;background:#000;border:1px solid var(--ln);border-radius:10px;padding:0 10px;min-height:50px;font-size:17px}
+.big:disabled{opacity:.4}
+.chips.w{flex-wrap:wrap}
+.sm{min-height:40px;padding:6px 12px}
+button:disabled{opacity:.5}
+.bx .row{margin:8px 0 0}.sc{align-self:center;text-align:center}
 </style>
 </head>
 <body>
@@ -114,7 +119,7 @@ nav button.on{color:var(--p2);border-top-color:var(--p);font-weight:700}
 const $=(s,e=document)=>e.querySelector(s);
 const DAYS=['Domingo','Segunda','Terça','Quarta','Quinta','Sexta','Sábado'],ORDER=[1,2,3,4,5,6,0];
 // Formato: nome | séries | t (t = exercício de tempo, em segundos). Repetições são lançadas na hora do treino.
-const DEF={
+const LEG={
 2:['Crucifixo reto na polia|3','Supino inclinado com halteres|3','Supino inclinado na máquina|3','Crucifixo na polia de cima para baixo|3','Voador (peck deck)|3','Rosca direta com barra W|3','Rosca Scott unilateral com halter|3','Rosca inclinada com halteres|3','Abdominal infra na cadeira romana|3'],
 4:['Cadeira flexora|3','Stiff com barra|3','Mesa flexora|3','Panturrilha sentada|5','Prancha lateral (por lado)|3|t'],
 5:['Remada baixa com triângulo|3','Puxador frente|3','Puxada unilateral na máquina|3','Remada curvada com barra|3','Tríceps francês com corda na polia|3','Paralela na máquina|3','Tríceps pulley com barra|3','Prancha convencional|3|t'],
@@ -123,15 +128,15 @@ const DEF={
 const parse=l=>{const[n,s,t]=l.split('|').map(x=>x.trim());return{n,s:Math.max(1,+s||3),t:t==='t'}};
 const toText=a=>a.map(e=>e.n+' | '+e.s+(e.t?' | t':'')).join('\n');
 let S;try{S=JSON.parse(localStorage.getItem('gym.v1'))}catch(e){}
-if(!S||!S.plan){S={plan:{},sessions:[],active:null,rest:90,restEnd:null,lastBackup:null};for(let d=0;d<7;d++)S.plan[d]=(DEF[d]||[]).map(parse)}
+if(!S||!S.plan){S={plan:{},sessions:[],active:null,rest:90,restEnd:null,lastBackup:null,pv:3};for(let d=0;d<7;d++)S.plan[d]=[]}
 if(S.restEnd&&S.restEnd<=Date.now())S.restEnd=null;
 const D0=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d};
 const addD=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 const mon=d=>{const x=D0(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
 S.cl=S.cl||{};S.goals=S.goals||{};
 if(!S.trk){const f=S.sessions[0];S.trk=D0(f?f.start:Date.now()).getTime()}
-if((S.pv||0)<2){for(let d=0;d<7;d++)S.plan[d]=(DEF[d]||[]).map(parse);S.pv=2;localStorage.setItem('gym.v1',JSON.stringify(S))}
-let tab='t',selDay=new Date().getDay(),planDay=selDay,progEx='',progMet='kg',openId=null,cv='s',wOff=0,mOff=0,yOff=0,cdd='';
+if(S.pv==null||S.pv<2){for(let d=0;d<7;d++)S.plan[d]=(LEG[d]||[]).map(parse);S.pv=3;localStorage.setItem('gym.v1',JSON.stringify(S))}
+let tab='t',selDay=new Date().getDay(),planDay=selDay,progEx='',progMet='kg',openId=null,cv='s',wOff=0,mOff=0,yOff=0,cdd='',xt='plan',xg=0;
 const save=()=>localStorage.setItem('gym.v1',JSON.stringify(S));
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const num=v=>parseFloat(String(v).replace(',','.'))||0;
@@ -222,11 +227,76 @@ return nv('yo',y)+`<div class="yg">${ms.join('')}</div><div class="pr"><span>Tot
 function viewCal(){const m=IX();
 return goalBanner()+stk()+`<div class="chips">${[['s','Semana'],['m','Mês'],['y','Ano']].map(([k,n])=>`<button class="chip ${cv===k?'on':''}" data-a="cv" data-v="${k}">${n}</button>`).join('')}</div>`+(cv==='s'?calSem(m):cv==='m'?calMes(m):calAno(m))+`<div class="lg"><span><i class="dc rest"></i>descanso</span><span><i class="dc pend"></i>programado</span><span><i class="dc ok"></i>treinou</span><span><i class="dc miss"></i>falta</span><span><i class="dc cd"></i>cardio</span></div>`}
 
+/* ---------- Questionário de treino (sem IA) ---------- */
+const LIB={
+peito:'Supino reto na máquina|1|1;Supino inclinado com halteres|0|1;Crucifixo na máquina (peck deck)|1|0;Supino reto com barra|0|1;Crucifixo na polia|1|0',
+costas:'Puxador frente|1|1;Remada baixa com triângulo|1|1;Remada na máquina|1|1;Remada curvada com barra|0|1;Puxada unilateral na máquina|1|0',
+ombros:'Desenvolvimento na máquina|1|1;Elevação lateral com halteres|0|0;Desenvolvimento com halteres|0|1;Crucifixo inverso na máquina|1|0;Elevação frontal com halteres|0|0',
+biceps:'Rosca direta com barra W|0|0;Rosca martelo|0|0;Rosca na polia|1|0;Rosca inclinada com halteres|0|0',
+triceps:'Tríceps pulley com corda|1|0;Tríceps pulley com barra|1|0;Tríceps francês com halter|0|0;Paralela na máquina|1|1',
+quadriceps:'Leg press|1|1;Cadeira extensora|1|0;Agachamento hack|1|1;Agachamento livre|0|1;Afundo com halteres|0|1',
+posterior:'Mesa flexora|1|0;Cadeira flexora|1|0;Stiff com halteres|0|1;Elevação pélvica|0|1',
+panturrilha:'Panturrilha em pé|1|0;Panturrilha sentada|1|0',
+abdomen:'Abdominal supra|0|0;Prancha convencional|0|0|t;Abdominal infra na cadeira romana|0|0;Prancha lateral (por lado)|0|0|t'};
+const lib=(g,easy)=>{const a=LIB[g].split(';').map(x=>{const[n,m,c,t]=x.split('|');return{n,m:+m,c:+c,t:t==='t'}});return easy?[...a].sort((x,y)=>y.m-x.m||y.c-x.c):[...a].sort((x,y)=>y.c-x.c||y.m-x.m)};
+function genPlan(q){
+const ds=[...q.days].sort((a,b)=>ORDER.indexOf(a)-ORDER.indexOf(b)),k=ds.length,easy=q.exp==='n'||q.lim,sr=q.exp==='n'?2:3;
+const FB=[['peito',1],['costas',1],['quadriceps',1],['posterior',1],['ombros',1],['abdomen',1]],UP=[['peito',2],['costas',2],['ombros',1],['biceps',1],['triceps',1]],LO=[['quadriceps',2],['posterior',2],['panturrilha',1],['abdomen',1]],PU=[['peito',2],['ombros',2],['triceps',2]],PL=[['costas',3],['biceps',2],['abdomen',1]];
+const F5=[[['peito',3],['triceps',2]],[['costas',3],['biceps',2]],[['quadriceps',3],['panturrilha',1]],[['ombros',3],['abdomen',2]],[['posterior',3],['panturrilha',1],['abdomen',1]]];
+const T=k===2?[FB,FB]:k===3?(q.exp==='i'?[PU,PL,LO]:[FB,FB,FB]):k===4?[UP,LO,UP,LO]:k===5?F5:[PU,PL,LO,PU,PL,LO];
+const used=new Map(),plan={};for(let d=0;d<7;d++)plan[d]=[];
+ds.forEach((d,i)=>{const t=T[i],o=used.get(t)||0;used.set(t,o+1);
+plan[d]=t.flatMap(([g,n])=>{const a=lib(g,easy);return Array.from({length:n},(_,j)=>a[(o*n+j)%a.length])}).map(e=>({n:e.n,s:sr,t:e.t}))});
+return{plan,days:ds}}
+let qz={exp:'',days:[],obj:'',lim:false,res:null};
+const QO=(k,arr)=>`<div class="chips w">${arr.map(([v,l])=>`<button class="chip ${qz[k]===v?'on':''}" data-a="qset" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
+function viewQ(){
+if(qz.res){const r=qz.res,any=ORDER.some(d=>(S.plan[d]||[]).length);
+return`<h2>Seu treino sugerido</h2><p class="mut">Sugestão geral, que não substitui a orientação de um profissional. Depois você ajusta tudo em Ajustes.</p>`+ORDER.filter(d=>r.plan[d].length).map(d=>`<section class="ex"><h3>${DAYS[d]}</h3><ul class="plan">${r.plan[d].map(e=>`<li><span>${esc(e.n)}</span><b>${e.s}×</b></li>`).join('')}</ul></section>`).join('')
++`<section class="ex"><h3>Dicas para começar</h3><p>Escolha uma carga que deixe 2 ou 3 repetições sobrando no fim de cada série e aumente aos poucos.</p><p>Descanse de 1 a 2 minutos entre as séries e aprenda a execução com calma. Peça ajuda a um instrutor da academia.</p><p>Cardio para começar: ${qz.exp==='n'||qz.obj==='m'?'60 a 90 min por semana':'120 a 150 min por semana'}, aumentando devagar. Defina a meta na aba Calendário.</p>${qz.lim?'<p>Como você indicou dor, lesão ou condição de saúde, converse com um médico ou profissional de educação física antes de começar. Priorizei máquinas, que são mais guiadas.</p>':''}</section>`
++`<button class="big" data-a="quse" ${any?'data-c="Toque de novo para substituir meu treino"':''}>Usar este treino</button><button class="ghost" style="width:100%" data-a="qredo">Refazer o questionário</button>`}
+const ok=qz.exp&&qz.obj&&qz.days.length>=2&&qz.days.length<=6;
+return`<h2>Monte seu treino</h2><p class="mut">Quatro perguntas e o app sugere uma divisão pronta. Não usa IA e funciona sem internet.</p>
+<section class="ex"><h3>Já sabe montar o seu treino?</h3><p class="mut">Escolha os exercícios de cada dia em uma lista por músculo.</p><button class="ghost" style="width:100%" data-a="qself">Montar meu treino sozinho</button></section>
+<h3>Qual é a sua experiência?</h3>${QO('exp',[['n','Nunca treinei'],['b','Já treinei um pouco'],['i','Treino há tempos']])}
+<h3>Em quais dias você pode treinar?</h3><p class="mut">Escolha de 2 a 6 dias.</p><div class="chips w">${ORDER.map(d=>`<button class="chip ${qz.days.includes(d)?'on':''}" data-a="qday" data-v="${d}">${DAYS[d].slice(0,3)}</button>`).join('')}</div>
+<h3>Qual é o seu objetivo?</h3>${QO('obj',[['m','Ganhar massa'],['g','Perder gordura'],['s','Saúde e condicionamento']])}
+<h3>Alguma limitação?</h3><div class="chips w"><button class="chip ${qz.lim?'on':''}" data-a="qlim">Tenho dor, lesão ou condição de saúde</button></div>
+<button class="big" data-a="qgen" ${ok?'':'disabled'}>Ver treino sugerido</button><button class="ghost" style="width:100%" data-a="tab" data-v="a">Voltar</button>`}
+
+/* ---------- Catálogo de exercícios e editor do treino ---------- */
+const CAT=[
+['Peito','Supino reto com barra;Supino reto com halteres;Supino reto na máquina;Supino inclinado com barra;Supino inclinado com halteres;Supino inclinado na máquina;Supino declinado;Crucifixo reto com halteres;Crucifixo inclinado com halteres;Crucifixo reto na polia;Crucifixo na polia de cima para baixo;Voador (peck deck);Flexão de braço'],
+['Costas','Puxador frente;Puxador com pegada supinada;Puxada unilateral na máquina;Remada baixa com triângulo;Remada curvada com barra;Remada unilateral com halter;Remada cavalinho;Remada na máquina;Pulldown com corda;Barra fixa;Levantamento terra;Hiperextensão lombar'],
+['Ombros','Desenvolvimento com halteres;Desenvolvimento com barra;Desenvolvimento na máquina;Elevação lateral com halteres;Elevação lateral na polia;Elevação lateral com triângulo na polia;Elevação frontal com halteres;Crucifixo inverso na máquina;Crucifixo inverso com halteres;Remada alta'],
+['Trapézio','Encolhimento de ombros com halteres;Encolhimento de ombros com barra;Encolhimento de ombros na máquina'],
+['Bíceps','Rosca direta com barra;Rosca direta com barra W;Rosca alternada com halteres;Rosca martelo;Rosca Scott na máquina;Rosca Scott unilateral com halter;Rosca inclinada com halteres;Rosca concentrada;Rosca na polia'],
+['Tríceps','Tríceps pulley com barra;Tríceps pulley com corda;Tríceps francês com halter;Tríceps francês com corda na polia;Tríceps testa com barra W;Tríceps coice;Paralela na máquina;Mergulho no banco;Supino fechado'],
+['Antebraços','Rosca martelo;Rosca inversa com barra ou halteres;Flexão de punho;Extensão de punho;Caminhada do fazendeiro'],
+['Quadríceps','Agachamento livre;Agachamento hack;Agachamento no smith;Agachamento búlgaro;Leg press;Cadeira extensora;Afundo com halteres;Passada'],
+['Posteriores de coxa','Cadeira flexora;Mesa flexora;Stiff com barra;Stiff com halteres;Levantamento terra romeno'],
+['Glúteos','Elevação pélvica;Glúteo na polia (coice);Glúteo na máquina;Agachamento sumô;Passada'],
+['Adutores e abdutores','Cadeira adutora;Cadeira abdutora'],
+['Panturrilha','Panturrilha em pé;Panturrilha sentada;Panturrilha no leg press'],
+['Abdômen','Abdominal supra;Abdominal infra na cadeira romana;Elevação de pernas no solo;Elevação de pernas na barra;Abdominal na máquina;Abdominal na polia;Abdominal oblíquo;Prancha convencional|t;Prancha lateral (por lado)|t'],
+['Pescoço','Flexão de pescoço;Extensão de pescoço;Flexão lateral de pescoço']
+].map(([g,l])=>({g,ex:l.split(';').map(x=>{const[n,t]=x.split('|');return{n,t:t==='t'}})}));
+function viewB(){const L=S.plan[planDay]||[];
+return`<h2>Meu treino</h2><div class="chips">${ORDER.map(i=>`<button class="chip ${i==planDay?'on':''}" data-a="planday" data-v="${i}">${DAYS[i].slice(0,3)}</button>`).join('')}</div><h3>${DAYS[planDay]}</h3>`
++(L.length?L.map((e,i)=>`<section class="ex bx"><div class="exh"><b>${esc(e.n)}</b><button class="ghost sm" data-a="bdel" data-i="${i}" data-c="Toque de novo para remover">Remover</button></div><div class="row"><button class="ghost" data-a="bup" data-i="${i}" aria-label="Subir">↑</button><button class="ghost" data-a="bdn" data-i="${i}" aria-label="Descer">↓</button><button class="ghost" data-a="bser" data-i="${i}" data-v="-1" aria-label="Menos uma série">−</button><span class="sc">${e.s} séries${e.t?' (tempo)':''}</span><button class="ghost" data-a="bser" data-i="${i}" data-v="1" aria-label="Mais uma série">+</button></div></section>`).join(''):'<p class="mut">Nenhum exercício neste dia. Sem exercícios, o dia vale como descanso.</p>')
++`<button class="big" data-a="xopen" data-t="plan">+ Adicionar exercício</button><button class="ghost" style="width:100%" data-a="tab" data-v="a">Voltar</button>`}
+function viewX(){const c=CAT[xg],L=xt==='plan'?(S.plan[planDay]||[]):(S.active?S.active.items:[]);
+return`<h2>Adicionar exercício</h2><p class="mut">${xt==='plan'?DAYS[planDay]:'Treino de hoje'}</p><div class="chips w">${CAT.map((x,i)=>`<button class="chip ${i===xg?'on':''}" data-a="xg" data-v="${i}">${x.g}</button>`).join('')}</div>`
++(c.g==='Pescoço'?'<p class="mut">Pescoço: use cargas leves e movimentos lentos e controlados.</p>':'')
++`<ul class="plan">${c.ex.map((e,j)=>{const has=L.some(x=>x.n===e.n);return`<li><span>${esc(e.n)}</span><button class="ghost sm" data-a="xadd" data-i="${j}" ${has?'disabled':''}>${has?'✓ no treino':'Adicionar'}</button></li>`}).join('')}</ul>
+<section class="ex"><h3>Outro exercício</h3><div class="row"><label><input id="xn" placeholder="nome do exercício"></label><button class="ghost" data-a="xcustom">Adicionar</button></div><p class="mut">Prancha e isometrias são registradas em segundos.</p></section>
+<button class="big" data-a="xdone">Concluir</button>`}
+
 /* ---------- Telas ---------- */
 function viewTreino(){
 const A=S.active;let h='';
 if(!A){
-const list=S.plan[selDay]||[];h+=goalBanner();
+const list=S.plan[selDay]||[];h+=goalBanner();if(ORDER.every(d=>!(S.plan[d]||[]).length))h+=`<section class="ex"><h3>Monte seu treino</h3><p class="mut">Responda algumas perguntas e o app sugere uma divisão pronta. Você também pode cadastrar tudo à mão em Ajustes.</p><button class="big" data-a="qopen">Montar meu treino</button></section>`;
 if(S.sessions.length&&(!S.lastBackup||Date.now()-S.lastBackup>7*864e5))h+=`<div class="warn">Faz mais de uma semana sem backup. <button data-a="tab" data-v="a">Exportar agora</button></div>`;
 h+=`<div class="chips">${ORDER.map(i=>`<button class="chip ${i==selDay?'on':''}" data-a="day" data-v="${i}">${DAYS[i].slice(0,3)}</button>`).join('')}</div><h2>${DAYS[selDay]}</h2>`;
 h+=list.length?`<ul class="plan">${list.map(e=>`<li><span>${esc(e.n)}</span><b>${e.s}×</b></li>`).join('')}</ul>`:`<p class="mut">Dia de descanso. Você ainda pode registrar um treino livre.</p>`;
@@ -287,13 +357,10 @@ const list=(S.plan[planDay]||[]);
 return`<h2>Backup</h2><p class="mut">Último backup: ${S.lastBackup?fd(S.lastBackup):'nunca'}. Os dados ficam só neste aparelho. Uma vez por semana, toque em Compartilhar e escolha o Google Drive ou o e-mail.</p>
 <button class="big" data-a="share">Compartilhar backup</button>
 <div class="row"><button class="ghost" data-a="export">Salvar arquivo</button><label class="ghost btn" style="min-height:46px">Importar backup<input type="file" id="imp" accept="application/json,.json" hidden></label></div>
-<h2>Meu treino</h2><div class="chips">${ORDER.map(i=>`<button class="chip ${i==planDay?'on':''}" data-a="planday" data-v="${i}">${DAYS[i].slice(0,3)}</button>`).join('')}</div>
-<textarea id="planta" rows="12" placeholder="Dia de descanso (sem exercícios)">${esc(toText(list))}</textarea>
-<p class="mut">Um exercício por linha: nome | séries. Acrescente | t nos exercícios de tempo, como prancha. Treinos já salvos não mudam.</p>
-<button class="big" data-a="plansave">Salvar ${DAYS[planDay].toLowerCase()}</button>`}
+<h2>Meu treino</h2><button class="big" data-a="bopen">Editar meu treino</button><button class="ghost" style="width:100%" data-a="qopen">Montar treino com questionário</button><p class="mut">Treinos já salvos no histórico não mudam quando você altera a divisão.</p>`}
 
 function render(){
-$('#app').innerHTML=({t:viewTreino,c:viewCal,h:viewHist,p:viewProg,a:viewAjustes})[tab]();
+$('#app').innerHTML=({t:viewTreino,b:viewB,x:viewX,q:viewQ,c:viewCal,h:viewHist,p:viewProg,a:viewAjustes})[tab]();
 document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===tab));
 renderRest()}
 
@@ -328,7 +395,7 @@ else if(a==='ok'){const s=A.items[d.i].sets[d.j];s.ok=!s.ok;save();if(s.ok)start
 else if(a==='addset'){const ss=A.items[d.i].sets;ss.push({kg:ss.length?ss[ss.length-1].kg:'',r:'',ok:false});save()}
 else if(a==='rmset'){const ss=A.items[d.i].sets;if(ss.length>1)ss.pop();save()}
 else if(a==='done'){const it=A.items[d.i];it.done=!it.done;save()}
-else if(a==='newex'){const n=prompt('Nome do exercício novo');if(n&&n.trim()){A.items.push({n:n.trim(),t:false,p:3,obs:'',done:false,sets:[1,2,3].map(()=>({kg:'',r:'',ok:false}))});save()}}
+else if(a==='newex'){xt='sess';tab='x'}
 else if(a==='finish'){A.end=Date.now();S.sessions.push(A);openId=A.id;S.active=null;S.restEnd=null;save();wl&&wl.release();tab='h'}
 else if(a==='cancel'){S.active=null;S.restEnd=null;save();wl&&wl.release()}
 else if(a==='rest'){startRest(+d.v);return}
@@ -336,7 +403,26 @@ else if(a==='radj'){S.restEnd=Math.max(Date.now()+1000,S.restEnd+d.v*1000);save(
 else if(a==='rstop'){S.restEnd=null;save();renderRest();return}
 else if(a==='hdel'){S.sessions=S.sessions.filter(x=>String(x.id)!==d.id);save()}
 else if(a==='planday'){planDay=+d.v}
-else if(a==='plansave'){S.plan[planDay]=$('#planta').value.split('\n').map(x=>x.trim()).filter(Boolean).map(parse);save();toast('Treino salvo')}
+else if(a==='qopen'){qz={exp:'',days:[],obj:'',lim:false,res:null};tab='q'}
+else if(a==='qset'){qz[d.k]=d.v}
+else if(a==='qday'){const v=+d.v;qz.days=qz.days.includes(v)?qz.days.filter(x=>x!==v):[...qz.days,v]}
+else if(a==='qlim'){qz.lim=!qz.lim}
+else if(a==='qgen'){if(qz.exp&&qz.obj&&qz.days.length>=2&&qz.days.length<=6)qz.res=genPlan(qz)}
+else if(a==='qredo'){qz.res=null}
+else if(a==='quse'){for(let k=0;k<7;k++)S.plan[k]=qz.res.plan[k];save();toast('Treino salvo');tab='t'}
+else if(a==='qself'){planDay=ORDER[0];tab='b'}
+else if(a==='bopen'){tab='b'}
+else if(a==='bdel'){S.plan[planDay].splice(+d.i,1);save()}
+else if(a==='bup'||a==='bdn'){const L=S.plan[planDay],i=+d.i,j=a==='bup'?i-1:i+1;if(j>=0&&j<L.length){[L[i],L[j]]=[L[j],L[i]];save()}}
+else if(a==='bser'){const e=S.plan[planDay][+d.i];e.s=Math.max(1,Math.min(10,e.s+ +d.v));save()}
+else if(a==='xopen'){xt=d.t;tab='x'}
+else if(a==='xg'){xg=+d.v}
+else if(a==='xadd'||a==='xcustom'){let n,t;
+if(a==='xadd'){const e=CAT[xg].ex[+d.i];n=e.n;t=e.t}else{n=($('#xn').value||'').trim();t=/prancha|isometri/i.test(n);if(!n){toast('Digite o nome');return}}
+if(xt==='plan'){const L=S.plan[planDay]=S.plan[planDay]||[];if(L.some(e=>e.n===n)){toast('Já está no treino');return}L.push({n,s:3,t})}
+else if(A){if(A.items.some(i=>i.n===n)){toast('Já está no treino de hoje');return}A.items.push({n,t,p:3,obs:'',done:false,sets:[1,2,3].map(()=>({kg:'',r:'',ok:false}))})}
+save();toast('Adicionado')}
+else if(a==='xdone'){tab=xt==='plan'?'b':'t'}
 else if(a==='cv'){cv=d.v}
 else if(a==='wo'){wOff+=+d.v}else if(a==='mo'){mOff+=+d.v}else if(a==='yo'){yOff+=+d.v}
 else if(a==='goal'){const v=num($('#'+d.id).value);if(v>0){S.goals[d.v]=v;save();toast('Meta salva')}else{toast('Informe os minutos');return}}
